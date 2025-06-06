@@ -5,3 +5,5 @@ GOOGLE_API_KEY= your_api
 WORDPRESS_URL=your_site_url
 WORDPRESS_USERNAME=your_username
 WORDPRESS_PASSWORD=your_pass
+
+HUGGINGFACE_API_KEY=your_API
