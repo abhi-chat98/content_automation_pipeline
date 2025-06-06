@@ -11,6 +11,8 @@ from PIL import Image
 import io
 import requests
 from datetime import datetime
+from diffusers import StableDiffusionPipeline
+import torch
 
 # Load environment variables
 load_dotenv()
@@ -25,10 +27,28 @@ GOOGLE_API_KEY = os.getenv('GOOGLE_API_KEY')
 if not GOOGLE_API_KEY:
     raise ValueError("GOOGLE_API_KEY not found in .env file")
 
-STABILITY_API_KEY = os.getenv('STABILITY_API_KEY')
+HUGGINGFACE_API_KEY = os.getenv('HUGGINGFACE_API_KEY')
+if not HUGGINGFACE_API_KEY:
+    raise ValueError("HUGGINGFACE_API_KEY not found in .env file")
 
 # Initialize Google API client
 client = genai.Client(api_key=GOOGLE_API_KEY)
+
+# Initialize Stable Diffusion pipeline (this will download the model first time)
+pipe = None
+
+def get_pipeline():
+    global pipe
+    if pipe is None:
+        # Initialize the pipeline with the small model
+        pipe = StableDiffusionPipeline.from_pretrained(
+            "CompVis/stable-diffusion-v1-4",
+            torch_dtype=torch.float32,
+            use_auth_token=HUGGINGFACE_API_KEY
+        )
+        if torch.cuda.is_available():
+            pipe = pipe.to("cuda")
+    return pipe
 
 def extract_title_and_body(text):
     """Extract title and body from generated text."""
@@ -154,55 +174,59 @@ def generate_content(topic, content_type="Case Study", keywords=None):
         return f"Error generating content: {str(e)}", ""
 
 def generate_image(prompt):
-    """Generate an image using Stability AI API."""
-    if not STABILITY_API_KEY:
-        raise ValueError("Image generation is not available. Please add STABILITY_API_KEY to your .env file to enable this feature.")
-        
+    """Generate an image using Hugging Face's API."""
     try:
-        # API endpoint for Stability AI
-        url = "https://api.stability.ai/v1/generation/stable-diffusion-xl-1024-v1-0/text-to-image"
-
+        # API endpoint for a more reliable model
+        API_URL = "https://api-inference.huggingface.co/models/stabilityai/stable-diffusion-xl-base-1.0"
+        
         # Headers for the API request
         headers = {
-            "Accept": "application/json",
-            "Content-Type": "application/json",
-            "Authorization": f"Bearer {STABILITY_API_KEY}",
+            "Authorization": f"Bearer {HUGGINGFACE_API_KEY}"
+        }
+        
+        # Body of the request - keeping it simple
+        payload = {
+            "inputs": prompt,
         }
 
-        # Body of the request
-        body = {
-            "steps": 40,
-            "width": 1024,
-            "height": 1024,
-            "seed": 0,
-            "cfg_scale": 7,
-            "samples": 1,
-            "text_prompts": [
-                {
-                    "text": prompt,
-                    "weight": 1
-                }
-            ],
-        }
-
+        print(f"Making request to {API_URL}")  # Debug print
+        
         # Make the API request
-        response = requests.post(url, headers=headers, json=body)
-
-        if response.status_code == 200:
-            # Get the image data from the response
-            data = response.json()
-            image_data = base64.b64decode(data["artifacts"][0]["base64"])
+        response = requests.post(API_URL, headers=headers, json=payload)
+        
+        print(f"Response status: {response.status_code}")  # Debug print
+        print(f"Response headers: {response.headers}")  # Debug print
+        
+        if response.status_code == 404:
+            raise Exception("Model not found. Please check the model URL or try a different model.")
+        
+        if response.status_code != 200:
+            # Try to get error message from response
+            try:
+                error_data = response.json()
+                error_msg = error_data.get('error', 'Unknown error occurred')
+            except:
+                error_msg = response.text if response.text else f"HTTP Status {response.status_code}"
+            raise Exception(f"API request failed: {error_msg}")
+        
+        # Check if we got image data
+        content_type = response.headers.get('content-type', '')
+        if not content_type.startswith('image/'):
+            raise Exception(f"Expected image response, got {content_type}")
             
-            # Create a PIL Image object
-            image = Image.open(io.BytesIO(image_data))
-            
-            # Save to a temporary file
-            with tempfile.NamedTemporaryFile(delete=False, suffix='.png') as tmp_file:
-                image.save(tmp_file, format='PNG')
-                return tmp_file.name
-        else:
-            raise Exception(f"Error generating image: {response.text}")
+        # Get the image data from the response
+        image_bytes = response.content
+        
+        # Create a PIL Image object
+        image = Image.open(io.BytesIO(image_bytes))
+        
+        # Save to a temporary file
+        with tempfile.NamedTemporaryFile(delete=False, suffix='.png') as tmp_file:
+            image.save(tmp_file, format='PNG')
+            return tmp_file.name
 
+    except requests.exceptions.RequestException as e:
+        raise Exception(f"Network error: {str(e)}")
     except Exception as e:
         raise Exception(f"Error generating image: {str(e)}")
 
@@ -234,28 +258,41 @@ def upload_to_wordpress(title, body, images=None):
         # Upload and add images if provided
         if images:
             content += '<div class="post-images">\n'
-            for image in images:
-                if image:
-                    # Create temporary file
-                    with tempfile.NamedTemporaryFile(delete=False, suffix=f".{image.name.split('.')[-1]}") as tmp_file:
-                        tmp_file.write(image.getvalue())
-                        tmp_file.flush()
+            for idx, image_data in enumerate(images):
+                if image_data:
+                    tmp_file = None
+                    try:
+                        # Create temporary file for the image
+                        tmp_file = tempfile.NamedTemporaryFile(delete=False, suffix='.png')
+                        tmp_file.write(image_data)
+                        tmp_file.close()  # Close the file before reading it again
                         
                         # Prepare file data
-                        filename = image.name
                         data = {
-                            'name': filename,
-                            'type': image.type,
+                            'name': f'image_{idx + 1}.png',
+                            'type': 'image/png',
                         }
                         
-                        # Read temporary file
+                        # Read the temporary file
                         with open(tmp_file.name, 'rb') as img:
                             data['bits'] = xmlrpc_client.Binary(img.read())
                         
                         # Upload to WordPress
                         response = wp.call(UploadFile(data))
                         if 'url' in response:
-                            content += f'    <img src="{response["url"]}" alt="Content Image" style="margin: 10px 0;" />\n'
+                            content += f'    <img src="{response["url"]}" alt="Content Image {idx + 1}" style="margin: 10px 0;" />\n'
+                    
+                    except Exception as e:
+                        raise Exception(f"Error uploading image {idx + 1}: {str(e)}")
+                    
+                    finally:
+                        # Clean up temporary file
+                        if tmp_file and os.path.exists(tmp_file.name):
+                            try:
+                                os.unlink(tmp_file.name)
+                            except Exception:
+                                pass  # Ignore cleanup errors
+            
             content += '</div>\n'
         
         # Add the body content with proper formatting
