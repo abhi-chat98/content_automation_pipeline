@@ -63,43 +63,95 @@ with st.container():
             key='content_type'
         )
 
-    # Add image generation section
+    # Add image generation sections
     st.subheader("Generate Custom Images")
     
-    if not os.getenv('STABILITY_API_KEY'):
-        st.warning("""
-        Image generation is not available. To enable this feature:
-        1. Sign up at https://platform.stability.ai/
-        2. Get your API key from the dashboard
-        3. Add it to your .env file as: STABILITY_API_KEY=your_api_key_here
-        
-        You can still use the manual image upload option below.
-        """)
-    else:
-        img_prompt_col1, img_prompt_col2 = st.columns([3, 1])
-        
-        with img_prompt_col1:
-            image_prompt = st.text_input(
-                "Image Generation Prompt",
-                placeholder="Describe the image you want to generate",
-                help="Be specific about what you want in the image. The image will be generated using Stable Diffusion XL.",
-                key='image_prompt'
-            )
-        
-        with img_prompt_col2:
-            if st.button("Generate Image", key="generate_image_btn"):
-                if image_prompt:
-                    with st.spinner("Generating image..."):
-                        try:
-                            image_path = generate_image(image_prompt)
-                            st.session_state['generated_image'] = image_path
-                            st.success("Image generated successfully!")
-                        except Exception as e:
-                            st.error(str(e))
+    # First Image Generation
+    st.markdown("#### Image 1")
+    img_prompt_col1, img_prompt_col2 = st.columns([3, 1])
+    
+    with img_prompt_col1:
+        image_prompt_1 = st.text_input(
+            "Image 1 Generation Prompt",
+            placeholder="Describe the first image you want to generate",
+            help="Be specific about what you want in the image. Using Stable Diffusion XL for high-quality image generation.",
+            key='image_prompt_1'
+        )
+    
+    with img_prompt_col2:
+        if st.button("Generate Image 1", key="generate_image_btn_1"):
+            if image_prompt_1:
+                with st.spinner("Generating image 1... This might take a few seconds."):
+                    try:
+                        # Add a message about the process
+                        status_placeholder = st.empty()
+                        status_placeholder.info("Sending request to Hugging Face API...")
+                        
+                        image_path = generate_image(image_prompt_1)
+                        st.session_state['generated_image_1'] = image_path
+                        
+                        status_placeholder.success("Image 1 generated successfully!")
+                    except Exception as e:
+                        st.error(f"Error: {str(e)}")
+                        st.info("If you're seeing a 'Model not found' error, please make sure you've accepted the model's terms at: https://huggingface.co/stabilityai/stable-diffusion-xl-base-1.0")
 
-        # Display generated image if available
-        if 'generated_image' in st.session_state and os.path.exists(st.session_state['generated_image']):
-            st.image(st.session_state['generated_image'], caption="Generated Image", use_column_width=True)
+    # Display generated image 1 if available
+    if 'generated_image_1' in st.session_state and os.path.exists(st.session_state['generated_image_1']):
+        col1, col2 = st.columns([1, 5])
+        
+        with col1:
+            # Show small preview
+            st.markdown("""
+                <style>
+                [data-testid="stExpanderToggleIcon"] {
+                    display: none;
+                }
+                </style>
+                """, unsafe_allow_html=True)
+            st.image(st.session_state['generated_image_1'], caption="Preview 1", width=100)
+            # Add small expander right under the preview
+            with st.expander("🔍 Enlarge", expanded=False):
+                st.image(st.session_state['generated_image_1'], use_column_width=True)
+
+    # Second Image Generation
+    st.markdown("#### Image 2")
+    img_prompt_col3, img_prompt_col4 = st.columns([3, 1])
+    
+    with img_prompt_col3:
+        image_prompt_2 = st.text_input(
+            "Image 2 Generation Prompt",
+            placeholder="Describe the second image you want to generate",
+            help="Be specific about what you want in the image. Using Stable Diffusion XL for high-quality image generation.",
+            key='image_prompt_2'
+        )
+    
+    with img_prompt_col4:
+        if st.button("Generate Image 2", key="generate_image_btn_2"):
+            if image_prompt_2:
+                with st.spinner("Generating image 2... This might take a few seconds."):
+                    try:
+                        # Add a message about the process
+                        status_placeholder_2 = st.empty()
+                        status_placeholder_2.info("Sending request to Hugging Face API...")
+                        
+                        image_path = generate_image(image_prompt_2)
+                        st.session_state['generated_image_2'] = image_path
+                        
+                        status_placeholder_2.success("Image 2 generated successfully!")
+                    except Exception as e:
+                        st.error(f"Error: {str(e)}")
+                        st.info("If you're seeing a 'Model not found' error, please make sure you've accepted the model's terms at: https://huggingface.co/stabilityai/stable-diffusion-xl-base-1.0")
+
+    # Display generated image 2 if available
+    if 'generated_image_2' in st.session_state and os.path.exists(st.session_state['generated_image_2']):
+        col3, col4 = st.columns([1, 5])
+        
+        with col3:
+            # Show small preview
+            st.image(st.session_state['generated_image_2'], caption="Preview 2", width=100)
+            # Add small expander right under the preview
+            with st.expander("🔍 Enlarge", expanded=False):
+                st.image(st.session_state['generated_image_2'], use_column_width=True)
 
     # Add regular image upload section
     st.subheader("Or Upload Images")
@@ -137,10 +189,19 @@ with st.container():
                 try:
                     # Prepare images list
                     images = []
+                    # Add generated image 1 if it exists
+                    if 'generated_image_1' in st.session_state and os.path.exists(st.session_state['generated_image_1']):
+                        with open(st.session_state['generated_image_1'], 'rb') as img_file:
+                            images.append(img_file.read())
+                    # Add generated image 2 if it exists
+                    if 'generated_image_2' in st.session_state and os.path.exists(st.session_state['generated_image_2']):
+                        with open(st.session_state['generated_image_2'], 'rb') as img_file:
+                            images.append(img_file.read())
+                    # Add uploaded images if they exist
                     if uploaded_file_1:
-                        images.append(uploaded_file_1)
+                        images.append(uploaded_file_1.getvalue())
                     if uploaded_file_2:
-                        images.append(uploaded_file_2)
+                        images.append(uploaded_file_2.getvalue())
                     
                     # Upload to WordPress using backend function
                     post_id = upload_to_wordpress(edited_title, edited_body, images)
