@@ -78,8 +78,13 @@ with st.container():
                     else:
                         st.session_state['speech_to_text'].stop_listening()
                         st.session_state['is_listening'] = False
-                        # Process any remaining audio and update the text input
-                        text = st.session_state['speech_to_text'].process_audio()
+                        
+                        # Process any remaining audio and update the text input whisper
+                        #text = st.session_state['speech_to_text'].process_audio()
+
+                        #to use speech recognition uncomment the following lines voice recognition google
+                        st.session_state['speech_to_text'].process_audio()
+                        text = st.session_state['speech_to_text'].get_text()
                         if text:
                             # Append new text to existing text with a space in between
                             current_text = st.session_state['transcribed_text']
@@ -88,7 +93,7 @@ with st.container():
                                 st.session_state['transcribed_text'] = f"{current_text} {new_text}"
                             else:
                                 st.session_state['transcribed_text'] = new_text
-                            st.experimental_rerun()
+                            st.rerun()
                 
                 # Show listening status
                 if st.session_state['is_listening']:
@@ -131,24 +136,31 @@ with st.container():
                     try:
                         # Add a message about the process
                         status_placeholder = st.empty()
-                        status_placeholder.info("Sending request to gemini API...")
+                        status_placeholder.info("Sending request to DALL-E API...")
                         
-                        image_path = main.generate_image(image_prompt_1, is_display_image=True)
-                        st.session_state['generated_image_1'] = image_path
-                        
-                        status_placeholder.success("Display picture generated successfully!")
+                        image_data = main.generate_image(image_prompt_1)
+                        if image_data:
+                            st.session_state['generated_image_1'] = image_data
+                            status_placeholder.success("Display picture generated successfully!")
+                        else:
+                            status_placeholder.error("Failed to generate image")
                     except Exception as e:
                         st.error(f"Error: {str(e)}")
-                        st.info("If you're seeing a 'Model not found' error, please make sure you've accepted the model's terms at: https://huggingface.co/stabilityai/stable-diffusion-xl-base-1.0")
 
     # Display generated image 1 if available
-    if 'generated_image_1' in st.session_state and os.path.exists(st.session_state['generated_image_1']):
+    import base64
+    from io import BytesIO
+    from PIL import Image
+
+    if 'generated_image_1' in st.session_state:
         col1, col2 = st.columns([1, 5])
         
         with col1:
-            st.image(st.session_state['generated_image_1'], caption="Display Picture Preview", width=100)
-            with st.expander("🔍 Enlarge", expanded=False):
-                st.image(st.session_state['generated_image_1'], use_column_width=True)
+            # Decode base64 string to bytes
+            image_bytes = base64.b64decode(st.session_state['generated_image_1'])
+            image = Image.open(BytesIO(image_bytes))
+            with st.expander("Display Picture Preview", expanded=True):
+                st.image(image)
 
     # Second Image Generation
     st.markdown("#### Content Picture")
@@ -169,26 +181,33 @@ with st.container():
                     try:
                         # Add a message about the process
                         status_placeholder = st.empty()
-                        status_placeholder.info("Sending request to Hugging Face API...")
+                        status_placeholder.info("Sending request to DALL-E API...")
                         
-                        image_path = main.generate_image(image_prompt_2, is_display_image=False)
-                        st.session_state['generated_image_2'] = image_path
-                        
-                        status_placeholder.success("Content picture generated successfully!")
+                        image_data = main.generate_image(image_prompt_2)
+                        if image_data:
+                            st.session_state['generated_image_2'] = image_data
+                            status_placeholder.success("Content picture generated successfully!")
+                        else:
+                            status_placeholder.error("Failed to generate image")
                     except Exception as e:
                         st.error(f"Error: {str(e)}")
-                        st.info("If you're seeing a 'Model not found' error, please make sure you've accepted the model's terms at: https://huggingface.co/stabilityai/stable-diffusion-xl-base-1.0")
 
     # Display generated image 2 if available
-    if 'generated_image_2' in st.session_state and os.path.exists(st.session_state['generated_image_2']):
+    if 'generated_image_2' in st.session_state:
+        import base64
+        from io import BytesIO
+        from PIL import Image
+
         col1, col2 = st.columns([1, 5])
         
         with col1:
-            st.image(st.session_state['generated_image_2'], caption="Content Picture Preview", width=100)
-            with st.expander("🔍 Enlarge", expanded=False):
-                st.image(st.session_state['generated_image_2'], use_column_width=True)
+            # Decode base64 string to bytes
+            image_bytes = base64.b64decode(st.session_state['generated_image_2'])
+            image = Image.open(BytesIO(image_bytes))
+            with st.expander("Content Picture Preview", expanded=True):
+                st.image(image)
 
-    # Add regular image upload section
+    # Add regular image upload sectionx
     st.subheader("Or Upload Images")
     img_col1, img_col2 = st.columns(2)
     
@@ -210,54 +229,81 @@ with st.container():
                 st.session_state['case_study_title'] = title
                 st.session_state['case_study_body'] = body
 
-    if st.session_state['case_study_title']:
-        st.subheader(f"{content_type} Title")
-        edited_title = st.text_input("Title", value=st.session_state['case_study_title'], key='case_study_title_input')
-
-    if st.session_state['case_study_body']:
-        st.subheader(f"{content_type} Body")
-        edited_body = st.text_area("Edit Body", value=st.session_state['case_study_body'], height=600, key='case_study_body_textarea')
+    # Create a container for the generated content
+    if st.session_state['case_study_title'] or st.session_state['case_study_body']:
+        st.subheader("Generated Content")
         
-        # Add Upload button - disable if upload is completed
+        # Title section
+        if st.session_state['case_study_title']:
+            title_col1, title_col2 = st.columns([1, 1])
+            with title_col1:
+                st.markdown("### Title")
+                st.markdown(f"**{st.session_state['case_study_title']}**")
+            with title_col2:
+                st.markdown("### Edit Title")
+                edited_title = st.text_input(
+                    "Edit the title below",
+                    value=st.session_state['case_study_title'],
+                    key='case_study_title_input'
+                )
+                if edited_title != st.session_state['case_study_title']:
+                    st.session_state['case_study_title'] = edited_title
+                    st.rerun()
+
+        # Body section
+        if st.session_state['case_study_body']:
+            st.markdown("### Content")
+            preview_col, edit_col = st.columns([1, 1])
+            
+            with preview_col:
+                st.markdown("#### Preview")
+                # Add custom CSS for table formatting
+                st.markdown("""
+                <style>
+                table {
+                    width: 100%;
+                    border-collapse: collapse;
+                }
+                </style>
+                """, unsafe_allow_html=True)
+                st.markdown(st.session_state['case_study_body'])
+            
+            with edit_col:
+                st.markdown("#### Edit Content")
+                edited_body = st.text_area(
+                    "Edit the content below",
+                    value=st.session_state['case_study_body'],
+                    height=400,
+                    key='case_study_body_input'
+                )
+                if edited_body != st.session_state['case_study_body']:
+                    st.session_state['case_study_body'] = edited_body
+                    st.rerun()
+
+        # Upload section
         if not st.session_state['upload_completed']:
-            if st.button("Upload to WordPress", key="upload_button"):
-                try:
-                    # Prepare images list
-                    images = []
-                    # Add generated image 1 if it exists
-                    if 'generated_image_1' in st.session_state and os.path.exists(st.session_state['generated_image_1']):
-                        with open(st.session_state['generated_image_1'], 'rb') as img_file:
-                            images.append(img_file.read())
-                    # Add generated image 2 if it exists
-                    if 'generated_image_2' in st.session_state and os.path.exists(st.session_state['generated_image_2']):
-                        with open(st.session_state['generated_image_2'], 'rb') as img_file:
-                            images.append(img_file.read())
-                    # Add uploaded images if they exist
-                    if uploaded_file_1:
-                        images.append(uploaded_file_1.getvalue())
-                    if uploaded_file_2:
-                        images.append(uploaded_file_2.getvalue())
-                    
-                    # Upload to WordPress using backend function
-                    post_id, page_url, link_html = main.upload_to_wordpress(edited_title, edited_body, images, content_type)
-                    
-                    # Set upload as completed
-                    st.session_state['upload_completed'] = True
-                    
-                    # Display success message with link
-                    st.success(f"Successfully published to WordPress!")
-                    st.markdown(f"**Page ID:** {post_id}")
-                    st.markdown(f"**Page URL:** {page_url}")
-                    st.markdown(link_html, unsafe_allow_html=True)
-                    
-                except Exception as e:
-                    st.error(str(e))
-        else:
-            st.success("Content has already been uploaded to WordPress!")
-            # Add a button to reset and allow uploading again
-            if st.button("Reset Upload Status"):
-                st.session_state['upload_completed'] = False
-                st.rerun()
+            st.subheader("Upload to WordPress")
+            if st.button("Upload Content", type="primary"):
+                with st.spinner("Uploading content to WordPress..."):
+                    try:
+                        # Get the images from session state
+                        images = []
+                        if 'generated_image_1' in st.session_state:
+                            images.append(st.session_state['generated_image_1'])
+                        if 'generated_image_2' in st.session_state:
+                            images.append(st.session_state['generated_image_2'])
+
+                        # Upload to WordPress
+                        post_id = main.upload_to_wordpress(
+                            st.session_state['case_study_title'],
+                            st.session_state['case_study_body'],
+                            images,
+                            st.session_state.get('content_type', 'Case Study')
+                        )
+                        st.session_state['upload_completed'] = True
+                        st.success(f"Content uploaded successfully! Post ID: {post_id}")
+                    except Exception as e:
+                        st.error(f"Error uploading content: {str(e)}")
     else:
         if topic:
             st.info(f"Click 'Generate {content_type}' to create the content.")
