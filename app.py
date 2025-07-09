@@ -2,6 +2,7 @@ import streamlit as st
 import main
 import os
 from spchTxt import SpeechToText
+import markdownify
 
 # Initialize speech-to-text
 if 'speech_to_text' not in st.session_state:
@@ -10,6 +11,8 @@ if 'is_listening' not in st.session_state:
     st.session_state['is_listening'] = False
 if 'transcribed_text' not in st.session_state:
     st.session_state['transcribed_text'] = ''
+if 'topic_input' not in st.session_state:
+    st.session_state['topic_input'] = ''
 
 # Streamlit UI
 st.set_page_config(page_title="Content Generator", page_icon="📝", layout="wide")
@@ -60,12 +63,12 @@ with st.container():
         with topic_container:
             col1_1, col1_2 = st.columns([5, 1])
             with col1_1:
-                # Use a unique key for the text input
-                topic = st.text_input(
+                # Use text_area instead of text_input for better multi-line support
+                topic = st.text_area(
                     "Topic",
-                    value=st.session_state['transcribed_text'],
                     placeholder="Enter the topic here",
-                    key='topic_input'
+                    key='topic_input',
+                    height=100
                 )
             with col1_2:
                 mic_button = st.button("🎙", help="Click to start/stop voice input")
@@ -79,21 +82,17 @@ with st.container():
                         st.session_state['speech_to_text'].stop_listening()
                         st.session_state['is_listening'] = False
                         
-                        # Process any remaining audio and update the text input whisper
-                        #text = st.session_state['speech_to_text'].process_audio()
-
-                        #to use speech recognition uncomment the following lines voice recognition google
                         st.session_state['speech_to_text'].process_audio()
                         text = st.session_state['speech_to_text'].get_text()
                         if text:
-                            # Append new text to existing text with a space in between
-                            current_text = st.session_state['transcribed_text']
+                            # Append new text to existing text in topic_input
+                            current_text = st.session_state.get('topic_input', '')
                             new_text = text.strip()
                             if current_text:
-                                st.session_state['transcribed_text'] = f"{current_text} {new_text}"
+                                st.session_state['topic_input'] = f"{current_text} {new_text}"
                             else:
-                                st.session_state['transcribed_text'] = new_text
-                            st.rerun()
+                                st.session_state['topic_input'] = new_text
+                            st.experimental_rerun()
                 
                 # Show listening status
                 if st.session_state['is_listening']:
@@ -266,7 +265,10 @@ with st.container():
                 }
                 </style>
                 """, unsafe_allow_html=True)
-                st.markdown(st.session_state['case_study_body'])
+                body_content = st.session_state['case_study_body']
+                if '<table' in body_content:
+                    body_content = markdownify.markdownify(body_content, heading_style="ATX")
+                st.markdown(body_content, unsafe_allow_html=True)
             
             with edit_col:
                 st.markdown("#### Edit Content")
