@@ -296,14 +296,21 @@ with st.container():
                             images.append(st.session_state['generated_image_2'])
 
                         # Upload to WordPress
-                        post_id = main.upload_to_wordpress(
+                        post_id, post_url = main.upload_to_wordpress(
                             st.session_state['case_study_title'],
                             st.session_state['case_study_body'],
                             images,
-                            st.session_state.get('content_type', 'Case Study')
+                            st.session_state.get('content_type', 'Case Study'),
+                            template=None,
+                            page_template=None,
+                            categories=None,
+                            meta=None
                         )
                         st.session_state['upload_completed'] = True
-                        st.success(f"Content uploaded successfully! Post ID: {post_id}")
+                        if post_url:
+                            st.success(f"Content uploaded successfully! Post URL: {post_url}")
+                        else:
+                            st.success(f"Content uploaded successfully! Post ID: {post_id}")
                     except Exception as e:
                         st.error(f"Error uploading content: {str(e)}")
     else:
