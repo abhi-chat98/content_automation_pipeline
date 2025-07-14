@@ -1,18 +1,8 @@
 import streamlit as st
 import main
 import os
-from spchTxt import SpeechToText
 import markdownify
 
-# Initialize speech-to-text
-if 'speech_to_text' not in st.session_state:
-    st.session_state['speech_to_text'] = SpeechToText()
-if 'is_listening' not in st.session_state:
-    st.session_state['is_listening'] = False
-if 'transcribed_text' not in st.session_state:
-    st.session_state['transcribed_text'] = ''
-if 'topic_input' not in st.session_state:
-    st.session_state['topic_input'] = ''
 
 # Streamlit UI
 st.set_page_config(page_title="Content Generator", page_icon="📝", layout="wide")
@@ -70,33 +60,6 @@ with st.container():
                     key='topic_input',
                     height=100
                 )
-            with col1_2:
-                mic_button = st.button("🎙", help="Click to start/stop voice input")
-                
-                if mic_button:
-                    if not st.session_state['is_listening']:
-                        st.session_state['speech_to_text'].start_listening()
-                        st.session_state['is_listening'] = True
-                        st.info("Listening... Speak now")
-                    else:
-                        st.session_state['speech_to_text'].stop_listening()
-                        st.session_state['is_listening'] = False
-                        
-                        st.session_state['speech_to_text'].process_audio()
-                        text = st.session_state['speech_to_text'].get_text()
-                        if text:
-                            # Append new text to existing text in topic_input
-                            current_text = st.session_state.get('topic_input', '')
-                            new_text = text.strip()
-                            if current_text:
-                                st.session_state['topic_input'] = f"{current_text} {new_text}"
-                            else:
-                                st.session_state['topic_input'] = new_text
-                            st.experimental_rerun()
-                
-                # Show listening status
-                if st.session_state['is_listening']:
-                    st.info("🎙 Listening... Click again to stop")
     
     with col2:
         keywords = st.text_input(
