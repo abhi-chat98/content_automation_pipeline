@@ -1,8 +1,0 @@
-
-# WordPress Configuration
-WORDPRESS_URL=your_site_url
-WORDPRESS_USERNAME=your_username
-WORDPRESS_PASSWORD=your_pass
-
-#open ai api
-OPENAI_API_KEY=
