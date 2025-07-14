@@ -176,7 +176,6 @@ def generate_content(topic, content_type="Case Study", keywords=None):
         prompt = get_prompt_for_content_type(content_type, topic, keywords)
         
         # Call OpenAI API using the new format
-        client = openai.OpenAI()
         response = openai.ChatCompletion.create(
     model="gpt-4",
     messages=[
