@@ -3,7 +3,6 @@ import os
 # from wordpress_xmlrpc.methods.posts import NewPost, GetPost, EditPost, GetPosts
 # from wordpress_xmlrpc.methods.media import UploadFile
 # from wordpress_xmlrpc.compat import xmlrpc_client
-from dotenv import load_dotenv
 import tempfile
 import base64
 from PIL import Image
@@ -24,18 +23,15 @@ collections.Iterable = collections.abc.Iterable
 
 __all__ = ['generate_content', 'upload_to_wordpress', 'generate_image']
 
-# Load environment variables
-load_dotenv()
-
 # WordPress configuration
-WORDPRESS_URL = os.getenv('WORDPRESS_URL')
-WORDPRESS_USERNAME = os.getenv('WORDPRESS_USERNAME')
-WORDPRESS_PASSWORD = os.getenv('WORDPRESS_PASSWORD')
+WORDPRESS_URL = st.secrets["WORDPRESS_URL"]
+WORDPRESS_USERNAME = st.secrets["WORDPRESS_USERNAME"]
+WORDPRESS_PASSWORD = st.secrets["WORDPRESS_PASSWORD"]
 
 # API Keys
-OPENAI_API_KEY = os.getenv('OPENAI_API_KEY')
+OPENAI_API_KEY = st.secrets["OPENAI_API_KEY"]
 if not OPENAI_API_KEY:
-    raise ValueError("OPENAI_API_KEY not found in .env file")
+    raise ValueError("OPENAI_API_KEY not found in Streamlit secrets")
 
 # Initialize OpenAI client
 openai.api_key = OPENAI_API_KEY
@@ -295,13 +291,10 @@ def upload_to_wordpress(title, body, images=None, content_type="Case Study", tem
     detail_featured_image_id = None
     if images:
         if len(images) > 0 and images[0]:
-            # Display picture (featured image)
             featured_media_id = upload_image_and_get_id(images[0], f"display_{datetime.now().strftime('%Y%m%d_%H%M%S')}.png")
         if len(images) > 1 and images[1]:
-            # Content picture (detail featured image)
             detail_featured_image_id = upload_image_and_get_id(images[1], f"content_{datetime.now().strftime('%Y%m%d_%H%M%S')}.png")
 
-    # Do NOT embed images in the post content; only use for featured and detail featured image
     post_content = f'<div style="color: white; font-size: 1.1em; line-height: 1.7;">{body}</div>'
 
     data = {
@@ -326,7 +319,7 @@ def upload_to_wordpress(title, body, images=None, content_type="Case Study", tem
         API_ENDPOINT,
         json=data,
         auth=HTTPBasicAuth(USERNAME, APP_PASSWORD),
-        verify=False  # Ignore SSL certificate verification
+        verify=False
     )
 
     if response.status_code in (201, 200):
@@ -336,12 +329,3 @@ def upload_to_wordpress(title, body, images=None, content_type="Case Study", tem
         return post_id, post_url
     else:
         raise Exception(f"Failed to upload post: {response.status_code} {response.text}")
-
-# Example call (replace with your actual data):
-# post_id, post_url, carousel_page_id, carousel_page_url = upload_post_and_update_carousel(
-#     title="My New Case Study",
-#     body="This is the body of the post.",
-#     display_image_data="...base64...",
-#     images=["...base64..."],
-#     content_type="Case Study"
-# )
