@@ -176,7 +176,11 @@ def generate_content(topic, content_type="Case Study", keywords=None):
         prompt = get_prompt_for_content_type(content_type, topic, keywords)
         
         # Call OpenAI API using the new format
-        response = openai.ChatCompletion.create(
+        from openai import OpenAI
+
+client = OpenAI(api_key=OPENAI_API_KEY)
+
+response = client.chat.completions.create(
     model="gpt-4",
     messages=[
         {"role": "system", "content": "You are a professional content writer specializing in manufacturing and production scheduling."},
@@ -185,6 +189,7 @@ def generate_content(topic, content_type="Case Study", keywords=None):
     temperature=0.7,
     max_tokens=2000
 )
+
 
         
         raw_text = response.choices[0].message.content
