@@ -18,7 +18,7 @@ import re
 import streamlit as st
 import collections
 import collections.abc
-import openai
+from openai import OpenAI
 collections.Iterable = collections.abc.Iterable
 
 __all__ = ['generate_content', 'upload_to_wordpress', 'generate_image']
