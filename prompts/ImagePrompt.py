@@ -71,7 +71,7 @@ Optimized for wide display (16:9 aspect ratio)
 Appropriate for industrial/manufacturing environments
 
 Composition Guidelines:
-16:9 aspect ratio (recommended resolution: 1280×720)
+16:9 aspect ratio (recommended resolution: 1792x1024)
 Balanced, wide composition
 Clear focal point (e.g., a machine in operation or worker interacting with technology)
 Professional, natural lighting
