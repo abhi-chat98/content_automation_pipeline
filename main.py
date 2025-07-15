@@ -1,47 +1,41 @@
 import os
-import tempfile
 import base64
 from PIL import Image
-import io
 import requests
 from requests.auth import HTTPBasicAuth
 from datetime import datetime
 from prompts.CaseStudyPrompt import get_case_study_prompt
 from prompts.BlogPrompt import get_blog_prompt
-from prompts.ImagePrompt import get_display_image_prompt, get_content_image_prompt
-import time
-import re
 import streamlit as st
 import collections
 import collections.abc
 from openai import OpenAI
 import httpx
+import re
 
 collections.Iterable = collections.abc.Iterable
 
 __all__ = ['generate_content', 'upload_to_wordpress', 'generate_image']
 
-# WordPress configuration
+# --- Configuration ---
 WORDPRESS_URL = st.secrets["WORDPRESS_URL"]
 WORDPRESS_USERNAME = st.secrets["WORDPRESS_USERNAME"]
 WORDPRESS_PASSWORD = st.secrets["WORDPRESS_PASSWORD"]
-
-# API Keys
 OPENAI_API_KEY = st.secrets["OPENAI_API_KEY"]
 if not OPENAI_API_KEY:
     raise ValueError("OPENAI_API_KEY not found in Streamlit secrets")
 
-# Initialize OpenAI client correctly (FIXED)
+# --- OpenAI Client ---
 client = OpenAI(
     api_key=OPENAI_API_KEY,
     http_client=httpx.Client(timeout=60)
 )
 
+# --- Utility Functions ---
 def extract_title_and_body(text):
     title = ""
     body = ""
     lines = text.split('\n')
-
     for i, line in enumerate(lines):
         if line.startswith('Title:'):
             title = line[6:].strip()
@@ -51,7 +45,6 @@ def extract_title_and_body(text):
             title = line.strip()
             body = '\n'.join(lines[1:]).strip()
             break
-
     if not title:
         title_start = text.lower().find("title:")
         body_start = text.lower().find("body:")
@@ -65,7 +58,6 @@ def extract_title_and_body(text):
                 body = '\n'.join(lines[1:]).strip()
             else:
                 body = text.strip()
-
     body = clean_body_text(body)
     body = format_body_text(body)
     return title, body
@@ -80,46 +72,6 @@ def format_body_text(text):
     text = text.replace("**", "")
     for section in sections:
         text = text.replace(section, f"**{section}**")
-
-    if "<table" in text:
-        parts = []
-        current_pos = 0
-        while True:
-            table_start = text.find("<table", current_pos)
-            if table_start == -1:
-                parts.append(text[current_pos:])
-                break
-            if table_start > current_pos:
-                parts.append(text[current_pos:table_start])
-            table_end = text.find("</table>", table_start)
-            if table_end == -1:
-                parts.append(text[table_start:])
-                break
-            parts.append(text[table_start:table_end + 8])
-            current_pos = table_end + 8
-        text = "".join(parts)
-    else:
-        lines = text.split('\n')
-        formatted_lines = []
-        in_table = False
-        table_lines = []
-        for line in lines:
-            if '|' in line and ('---' in line or any(c in line for c in ['Aspect', 'Traditional', 'Modern'])):
-                in_table = True
-                table_lines.append(line)
-            elif in_table and '|' in line:
-                table_lines.append(line)
-            else:
-                if in_table:
-                    if len(table_lines) >= 3:
-                        formatted_lines.extend(table_lines)
-                    in_table = False
-                    table_lines = []
-                formatted_lines.append(line)
-        if table_lines:
-            formatted_lines.extend(table_lines)
-        text = '\n'.join(formatted_lines)
-
     text = text.replace("\n\n\n", "\n\n")
     return text.strip()
 
@@ -138,10 +90,10 @@ def get_prompt_for_content_type(content_type, topic, keywords=None):
     else:
         raise ValueError(f"Unsupported content type: {content_type}")
 
+# --- Content Generation ---
 def generate_content(topic, content_type="Case Study", keywords=None):
     try:
         prompt = get_prompt_for_content_type(content_type, topic, keywords)
-
         response = client.chat.completions.create(
             model="gpt-4",
             messages=[
@@ -151,16 +103,15 @@ def generate_content(topic, content_type="Case Study", keywords=None):
             temperature=0.7,
             max_tokens=2000
         )
-
         raw_text = response.choices[0].message.content
         title, body = extract_title_and_body(raw_text)
         return title, body
-
     except Exception as e:
         if "429" in str(e):
             return "Error: Quota exceeded. Please check your API plan and billing details.", ""
         return f"Error generating content: {str(e)}", ""
 
+# --- Image Generation ---
 def generate_image(prompt, size="1024x1024"):
     try:
         response = client.images.generate(
@@ -181,6 +132,7 @@ def generate_image(prompt, size="1024x1024"):
         print(f"Error generating image: {str(e)}")
         return None
 
+# --- Upload to WordPress ---
 def upload_to_wordpress(title, body, images=None, content_type="Case Study", template=None, page_template=None, categories=None, meta=None):
     if content_type == "Case Study":
         API_ENDPOINT = f"{WORDPRESS_URL}/wp-json/wp/v2/use-case"
@@ -189,15 +141,6 @@ def upload_to_wordpress(title, body, images=None, content_type="Case Study", tem
 
     USERNAME = WORDPRESS_USERNAME
     APP_PASSWORD = WORDPRESS_PASSWORD
-
-    images_html = ""
-    if images:
-        for idx, image_data in enumerate(images):
-            if image_data:
-                image_binary = base64.b64decode(image_data)
-                filename = f"image_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{idx}.png"
-                b64str = base64.b64encode(image_binary).decode('utf-8')
-                images_html += f'<img src="data:image/png;base64,{b64str}" alt="{filename}" />\n'
 
     def upload_image_and_get_id(image_data, filename):
         media_endpoint = f"{WORDPRESS_URL}/wp-json/wp/v2/media"
@@ -214,15 +157,21 @@ def upload_to_wordpress(title, body, images=None, content_type="Case Study", tem
             verify=False
         )
         resp.raise_for_status()
-        return resp.json()['id']
+        return resp.json()['id'], resp.json()['source_url']
 
     featured_media_id = None
     detail_featured_image_id = None
+    content_image_url = None
+
     if images:
         if len(images) > 0 and images[0]:
-            featured_media_id = upload_image_and_get_id(images[0], f"display_{datetime.now().strftime('%Y%m%d_%H%M%S')}.png")
+            featured_media_id, _ = upload_image_and_get_id(images[0], f"display_{datetime.now().strftime('%Y%m%d_%H%M%S')}.png")
         if len(images) > 1 and images[1]:
-            detail_featured_image_id = upload_image_and_get_id(images[1], f"content_{datetime.now().strftime('%Y%m%d_%H%M%S')}.png")
+            detail_featured_image_id, content_image_url = upload_image_and_get_id(images[1], f"content_{datetime.now().strftime('%Y%m%d_%H%M%S')}.png")
+
+    # Embed second image (content) in body if available
+    if content_image_url:
+        body = f'<img src="{content_image_url}" style="max-width: 100%; height: auto;" /><br><br>' + body
 
     post_content = f'<div style="color: white; font-size: 1.1em; line-height: 1.7;">{body}</div>'
 
