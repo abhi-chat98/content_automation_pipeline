@@ -1,8 +1,4 @@
 import os
-# from wordpress_xmlrpc import Client, WordPressPost
-# from wordpress_xmlrpc.methods.posts import NewPost, GetPost, EditPost, GetPosts
-# from wordpress_xmlrpc.methods.media import UploadFile
-# from wordpress_xmlrpc.compat import xmlrpc_client
 import tempfile
 import base64
 from PIL import Image
@@ -33,7 +29,7 @@ OPENAI_API_KEY = st.secrets["OPENAI_API_KEY"]
 if not OPENAI_API_KEY:
     raise ValueError("OPENAI_API_KEY not found in Streamlit secrets")
 
-# Initialize OpenAI client
+# Set OpenAI key
 openai.api_key = OPENAI_API_KEY
 
 def extract_title_and_body(text):
@@ -41,7 +37,6 @@ def extract_title_and_body(text):
     body = ""
     lines = text.split('\n')
     
-    # First try to find explicit title/body markers
     for i, line in enumerate(lines):
         if line.startswith('Title:'):
             title = line[6:].strip()
@@ -52,7 +47,6 @@ def extract_title_and_body(text):
             body = '\n'.join(lines[1:]).strip()
             break
 
-    # If no title found, try to find implicit markers
     if not title:
         title_start = text.lower().find("title:")
         body_start = text.lower().find("body:")
@@ -60,7 +54,6 @@ def extract_title_and_body(text):
             title = text[title_start + len("title:"):body_start].strip()
             body = text[body_start + len("body:"):].strip()
         else:
-            # If still no title, use first line as title
             first_line = lines[0].strip()
             if first_line:
                 title = first_line
@@ -68,62 +61,42 @@ def extract_title_and_body(text):
             else:
                 body = text.strip()
 
-    # Clean up the body text
     body = clean_body_text(body)
-    
-    # Format the body with proper markdown
     body = format_body_text(body)
     
     return title, body
 
 def format_body_text(text):
-    # Add proper spacing for sections
     sections = [
         "Problem Statement:", "How sfHawk Helps:", "Benefits:", "Conclusion:",
         "Introduction:", "Main Content:", "Key Points:", "Summary:"
     ]
     
     for section in sections:
-        # Replace multiple newlines before section with a single newline
         text = re.sub(rf"\n*{re.escape(section)}", f"\n{section}", text)
     
-    # Add proper markdown formatting
-    text = text.replace("**", "")  # Remove any existing markdown
+    text = text.replace("**", "")
     for section in sections:
         text = text.replace(section, f"**{section}**")
     
-    # Handle table formatting
-    # First, preserve any existing HTML tables
     if "<table" in text:
-        # Split the text into parts, preserving table HTML
         parts = []
         current_pos = 0
         while True:
             table_start = text.find("<table", current_pos)
             if table_start == -1:
-                # Add remaining text
                 parts.append(text[current_pos:])
                 break
-            
-            # Add text before table
             if table_start > current_pos:
                 parts.append(text[current_pos:table_start])
-            
-            # Find table end
             table_end = text.find("</table>", table_start)
             if table_end == -1:
-                # If no end tag found, treat rest as table
                 parts.append(text[table_start:])
                 break
-            
-            # Add table with its tags
             parts.append(text[table_start:table_end + 8])
             current_pos = table_end + 8
-        
-        # Join parts back together
         text = "".join(parts)
     else:
-        # If no HTML table, try to format as markdown table
         lines = text.split('\n')
         formatted_lines = []
         in_table = False
@@ -137,23 +110,18 @@ def format_body_text(text):
                 table_lines.append(line)
             else:
                 if in_table:
-                    # Format collected table lines
-                    if len(table_lines) >= 3:  # At least header, separator, and one row
+                    if len(table_lines) >= 3:
                         formatted_lines.extend(table_lines)
                     in_table = False
                     table_lines = []
                 formatted_lines.append(line)
         
-        # Add any remaining table lines
         if table_lines:
             formatted_lines.extend(table_lines)
         
         text = '\n'.join(formatted_lines)
     
-    # Ensure proper line breaks
-    text = text.replace("\n\n\n", "\n\n")  # Remove excessive line breaks
-    text = text.strip()
-    
+    text = text.replace("\n\n\n", "\n\n").strip()
     return text
 
 def clean_body_text(text):
@@ -171,15 +139,11 @@ def get_prompt_for_content_type(content_type, topic, keywords=None):
     else:
         raise ValueError(f"Unsupported content type: {content_type}")
 
-import openai
-
 def generate_content(topic, content_type="Case Study", keywords=None):
     try:
         prompt = get_prompt_for_content_type(content_type, topic, keywords)
 
-        openai.api_key = OPENAI_API_KEY  # Set once before using OpenAI SDK
-
-        response = openai.chat.completions.create(
+        response = openai.ChatCompletion.create(
             model="gpt-4",
             messages=[
                 {"role": "system", "content": "You are a professional content writer specializing in manufacturing and production scheduling."},
@@ -189,7 +153,7 @@ def generate_content(topic, content_type="Case Study", keywords=None):
             max_tokens=2000
         )
 
-        raw_text = response.choices[0].message.content
+        raw_text = response.choices[0].message['content']
         title, body = extract_title_and_body(raw_text)
 
         return title, body
@@ -199,26 +163,16 @@ def generate_content(topic, content_type="Case Study", keywords=None):
             return "Error: Quota exceeded. Please check your API plan and billing details.", ""
         return f"Error generating content: {str(e)}", ""
 
-
-
 def generate_image(prompt, size="1024x1024"):
     try:
-        # Generate image using DALL-E
-        response = openai.images.generate(
-            model="dall-e-3",  # Using DALL-E 3 for best quality
+        response = openai.Image.create(
             prompt=prompt,
             size=size,
-            quality="standard",
             n=1
         )
-
-        # Get the image URL from the response
-        image_url = response.data[0].url
-
-        # Download the image
+        image_url = response['data'][0]['url']
         image_response = requests.get(image_url)
         if image_response.status_code == 200:
-            # Convert to base64
             image_data = base64.b64encode(image_response.content).decode('utf-8')
             return image_data
         else:
@@ -228,23 +182,7 @@ def generate_image(prompt, size="1024x1024"):
         print(f"Error generating image: {str(e)}")
         return None
 
-
 def upload_to_wordpress(title, body, images=None, content_type="Case Study", template=None, page_template=None, categories=None, meta=None):
-    """
-    Uploads a post to WordPress using the REST API (not XML-RPC).
-    Args:
-        title (str): Post title.
-        body (str): Post body/content.
-        images (list): List of base64-encoded images (optional, will be embedded in content).
-        content_type (str): Type of content (default 'Case Study').
-        template (str): HTML template for the post (ignored now).
-        page_template (str): Page template for the post (optional).
-        categories (list): List of category IDs (optional).
-        meta (dict): Custom fields/meta (optional).
-    Returns:
-        post_id, post_url
-    """
-    # Use REST API endpoint based on content type
     if content_type == "Case Study":
         API_ENDPOINT = f"{WORDPRESS_URL}/wp-json/wp/v2/use-case"
     else:
@@ -259,11 +197,9 @@ def upload_to_wordpress(title, body, images=None, content_type="Case Study", tem
             if image_data:
                 image_binary = base64.b64decode(image_data)
                 filename = f"image_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{idx}.png"
-                # We'll embed as <img> with data URI for now
                 b64str = base64.b64encode(image_binary).decode('utf-8')
                 images_html += f'<img src="data:image/png;base64,{b64str}" alt="{filename}" />\n'
 
-    # --- IMAGE UPLOADS (by file-like object, using IDs) ---
     def upload_image_and_get_id(image_data, filename):
         media_endpoint = f"{WORDPRESS_URL}/wp-json/wp/v2/media"
         image_binary = base64.b64decode(image_data)
