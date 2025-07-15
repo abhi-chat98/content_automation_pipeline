@@ -54,6 +54,7 @@ with st.container():
                     st.session_state['case_study_title'] = title
                     st.session_state['case_study_body'] = body
                     st.session_state['upload_completed'] = False  # ✅ Reset on new content generation
+                    st.rerun()  # Force rerun to update the UI immediately
                 else:
                     st.error("Failed to generate content. Please try again.")
 
