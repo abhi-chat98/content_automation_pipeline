@@ -171,13 +171,15 @@ def get_prompt_for_content_type(content_type, topic, keywords=None):
     else:
         raise ValueError(f"Unsupported content type: {content_type}")
 
+import openai
+
 def generate_content(topic, content_type="Case Study", keywords=None):
     try:
         prompt = get_prompt_for_content_type(content_type, topic, keywords)
 
-        openai.api_key = OPENAI_API_KEY
+        openai.api_key = OPENAI_API_KEY  # Set once before using OpenAI SDK
 
-        response = client.chat.completions.create(
+        response = openai.chat.completions.create(
             model="gpt-4",
             messages=[
                 {"role": "system", "content": "You are a professional content writer specializing in manufacturing and production scheduling."},
@@ -190,20 +192,13 @@ def generate_content(topic, content_type="Case Study", keywords=None):
         raw_text = response.choices[0].message.content
         title, body = extract_title_and_body(raw_text)
 
-        for md_bold in ["**Problem Statement:**", "**How sfHawk Helps:**", "**Benefits:**", "**Conclusion:**",
-                        "**Introduction:**", "**Main Content:**", "**Key Points:**"]:
-            body = body.replace(md_bold, md_bold.strip('*'))
-        body = body.replace("**", "")
-        for heading in ["Problem Statement:", "How sfHawk Helps:", "Benefits:", "Conclusion:",
-                        "Introduction:", "Main Content:", "Key Points:"]:
-            body = body.replace(heading, f"\n{heading}")
-
         return title, body
 
     except Exception as e:
         if "429" in str(e):
-            return "Error: Quota exceeded. Please check your API plan and billing details, and try again later.", ""
+            return "Error: Quota exceeded. Please check your API plan and billing details.", ""
         return f"Error generating content: {str(e)}", ""
+
 
 
 def generate_image(prompt, size="1024x1024"):
