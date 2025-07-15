@@ -31,13 +31,10 @@ OPENAI_API_KEY = st.secrets["OPENAI_API_KEY"]
 if not OPENAI_API_KEY:
     raise ValueError("OPENAI_API_KEY not found in Streamlit secrets")
 
-# ✅ Initialize OpenAI Client (Streamlit Cloud Safe)
+# Initialize OpenAI client correctly (FIXED)
 client = OpenAI(
     api_key=OPENAI_API_KEY,
-    http_client=httpx.Client(
-        proxies=None,
-        timeout=60
-    )
+    http_client=httpx.Client(timeout=60)
 )
 
 def extract_title_and_body(text):
@@ -71,7 +68,6 @@ def extract_title_and_body(text):
 
     body = clean_body_text(body)
     body = format_body_text(body)
-
     return title, body
 
 def format_body_text(text):
@@ -79,10 +75,8 @@ def format_body_text(text):
         "Problem Statement:", "How sfHawk Helps:", "Benefits:", "Conclusion:",
         "Introduction:", "Main Content:", "Key Points:", "Summary:"
     ]
-
     for section in sections:
         text = re.sub(rf"\n*{re.escape(section)}", f"\n{section}", text)
-
     text = text.replace("**", "")
     for section in sections:
         text = text.replace(section, f"**{section}**")
@@ -109,7 +103,6 @@ def format_body_text(text):
         formatted_lines = []
         in_table = False
         table_lines = []
-
         for line in lines:
             if '|' in line and ('---' in line or any(c in line for c in ['Aspect', 'Traditional', 'Modern'])):
                 in_table = True
@@ -128,8 +121,7 @@ def format_body_text(text):
         text = '\n'.join(formatted_lines)
 
     text = text.replace("\n\n\n", "\n\n")
-    text = text.strip()
-    return text
+    return text.strip()
 
 def clean_body_text(text):
     if text.lstrip().startswith('Body:'):
@@ -178,7 +170,6 @@ def generate_image(prompt, size="1024x1024"):
             quality="standard",
             n=1
         )
-
         image_url = response.data[0].url
         image_response = requests.get(image_url)
         if image_response.status_code == 200:
@@ -186,7 +177,6 @@ def generate_image(prompt, size="1024x1024"):
             return image_data
         else:
             return None
-
     except Exception as e:
         print(f"Error generating image: {str(e)}")
         return None
@@ -261,8 +251,6 @@ def upload_to_wordpress(title, body, images=None, content_type="Case Study", tem
 
     if response.status_code in (201, 200):
         resp_json = response.json()
-        post_id = resp_json.get("id")
-        post_url = resp_json.get("link")
-        return post_id, post_url
+        return resp_json.get("id"), resp_json.get("link")
     else:
         raise Exception(f"Failed to upload post: {response.status_code} {response.text}")
