@@ -14,7 +14,8 @@ import re
 import streamlit as st
 import collections
 import collections.abc
-import openai
+from openai import OpenAI  # ✅ NEW SDK
+
 collections.Iterable = collections.abc.Iterable
 
 __all__ = ['generate_content', 'upload_to_wordpress', 'generate_image']
@@ -29,8 +30,8 @@ OPENAI_API_KEY = st.secrets["OPENAI_API_KEY"]
 if not OPENAI_API_KEY:
     raise ValueError("OPENAI_API_KEY not found in Streamlit secrets")
 
-# Set OpenAI key
-openai.api_key = OPENAI_API_KEY
+# ✅ Initialize OpenAI Client using new SDK
+client = OpenAI(api_key=OPENAI_API_KEY)
 
 def extract_title_and_body(text):
     title = ""
@@ -63,7 +64,6 @@ def extract_title_and_body(text):
 
     body = clean_body_text(body)
     body = format_body_text(body)
-    
     return title, body
 
 def format_body_text(text):
@@ -78,7 +78,7 @@ def format_body_text(text):
     text = text.replace("**", "")
     for section in sections:
         text = text.replace(section, f"**{section}**")
-    
+
     if "<table" in text:
         parts = []
         current_pos = 0
@@ -101,7 +101,6 @@ def format_body_text(text):
         formatted_lines = []
         in_table = False
         table_lines = []
-        
         for line in lines:
             if '|' in line and ('---' in line or any(c in line for c in ['Aspect', 'Traditional', 'Modern'])):
                 in_table = True
@@ -115,14 +114,12 @@ def format_body_text(text):
                     in_table = False
                     table_lines = []
                 formatted_lines.append(line)
-        
         if table_lines:
             formatted_lines.extend(table_lines)
-        
         text = '\n'.join(formatted_lines)
-    
-    text = text.replace("\n\n\n", "\n\n").strip()
-    return text
+
+    text = text.replace("\n\n\n", "\n\n")
+    return text.strip()
 
 def clean_body_text(text):
     if text.lstrip().startswith('Body:'):
@@ -142,8 +139,7 @@ def get_prompt_for_content_type(content_type, topic, keywords=None):
 def generate_content(topic, content_type="Case Study", keywords=None):
     try:
         prompt = get_prompt_for_content_type(content_type, topic, keywords)
-
-        response = openai.ChatCompletion.create(
+        response = client.chat.completions.create(  # ✅ NEW SYNTAX
             model="gpt-4",
             messages=[
                 {"role": "system", "content": "You are a professional content writer specializing in manufacturing and production scheduling."},
@@ -152,12 +148,9 @@ def generate_content(topic, content_type="Case Study", keywords=None):
             temperature=0.7,
             max_tokens=2000
         )
-
-        raw_text = response.choices[0].message['content']
+        raw_text = response.choices[0].message.content
         title, body = extract_title_and_body(raw_text)
-
         return title, body
-
     except Exception as e:
         if "429" in str(e):
             return "Error: Quota exceeded. Please check your API plan and billing details.", ""
@@ -165,19 +158,20 @@ def generate_content(topic, content_type="Case Study", keywords=None):
 
 def generate_image(prompt, size="1024x1024"):
     try:
-        response = openai.Image.create(
+        response = client.images.generate(  # ✅ NEW SYNTAX
+            model="dall-e-3",
             prompt=prompt,
             size=size,
+            quality="standard",
             n=1
         )
-        image_url = response['data'][0]['url']
+        image_url = response.data[0].url
         image_response = requests.get(image_url)
         if image_response.status_code == 200:
             image_data = base64.b64encode(image_response.content).decode('utf-8')
             return image_data
         else:
             return None
-
     except Exception as e:
         print(f"Error generating image: {str(e)}")
         return None
@@ -241,9 +235,7 @@ def upload_to_wordpress(title, body, images=None, content_type="Case Study", tem
     if meta:
         data["meta"] = {**data.get("meta", {}), **meta}
     if page_template:
-        if "meta" not in data:
-            data["meta"] = {}
-        data["meta"]["_wp_page_template"] = page_template
+        data.setdefault("meta", {})["_wp_page_template"] = page_template
 
     response = requests.post(
         API_ENDPOINT,
