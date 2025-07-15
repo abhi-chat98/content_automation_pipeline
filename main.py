@@ -210,7 +210,7 @@ response = client.chat.completions.create(
 def generate_image(prompt, size="1024x1024"):
     try:
         # Initialize OpenAI client
-        client = openai.OpenAI()
+        client = OpenAI(api_key=OPENAI_API_KEY)
         
         # Generate image using DALL-E
         response = client.images.generate(
