@@ -34,7 +34,7 @@ if not OPENAI_API_KEY:
     raise ValueError("OPENAI_API_KEY not found in Streamlit secrets")
 
 # Initialize OpenAI client
-openai.api_key = OPENAI_API_KEY
+client = OpenAI(api_key=OPENAI_API_KEY)
 
 def extract_title_and_body(text):
     title = ""
