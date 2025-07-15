@@ -18,13 +18,7 @@ import re
 import streamlit as st
 import collections
 import collections.abc
-
-os.environ.pop("http_proxy", None)
-os.environ.pop("https_proxy", None)
-os.environ.pop("HTTP_PROXY", None)
-os.environ.pop("HTTPS_PROXY", None)
-
-from openai import OpenAI
+import openai
 collections.Iterable = collections.abc.Iterable
 
 __all__ = ['generate_content', 'upload_to_wordpress', 'generate_image']
@@ -40,7 +34,7 @@ if not OPENAI_API_KEY:
     raise ValueError("OPENAI_API_KEY not found in Streamlit secrets")
 
 # Initialize OpenAI client
-client = OpenAI(api_key=OPENAI_API_KEY)
+openai.api_key = OPENAI_API_KEY
 
 def extract_title_and_body(text):
     title = ""
@@ -181,7 +175,7 @@ def generate_content(topic, content_type="Case Study", keywords=None):
     try:
         prompt = get_prompt_for_content_type(content_type, topic, keywords)
 
-        client = OpenAI(api_key=OPENAI_API_KEY)
+        openai.api_key = OPENAI_API_KEY
 
         response = client.chat.completions.create(
             model="gpt-4",
