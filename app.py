@@ -53,7 +53,7 @@ with st.container():
                 if title and body and not title.startswith("Error"):
                     st.session_state['case_study_title'] = title
                     st.session_state['case_study_body'] = body
-                    st.session_state['upload_completed'] = True  # ✅ Reset on new content generation
+                    st.session_state['upload_completed'] = False  # <-- CHANGE: Reset on new content generation
                     st.rerun()  # Force rerun to update the UI immediately
                 else:
                     st.error("Failed to generate content. Please try again.")
@@ -137,7 +137,7 @@ with st.container():
             edited_title = st.text_input("Edit the title below", value=st.session_state['case_study_title'], key='case_study_title_input')
             if edited_title != st.session_state['case_study_title']:
                 st.session_state['case_study_title'] = edited_title
-                st.session_state['upload_completed'] = False  # ✅ Reset when title is edited
+                st.session_state['upload_completed'] = False  # <-- CHANGE: Reset when title is edited
                 st.rerun()
 
         preview_col, edit_col = st.columns([1, 1])
@@ -154,7 +154,7 @@ with st.container():
             edited_body = st.text_area("Edit the content below", value=st.session_state['case_study_body'], height=400, key='case_study_body_input')
             if edited_body != st.session_state['case_study_body']:
                 st.session_state['case_study_body'] = edited_body
-                st.session_state['upload_completed'] = False  # ✅ Reset when body is edited
+                st.session_state['upload_completed'] = False  # <-- CHANGE: Reset when body is edited
                 st.rerun()
 
         # Upload button - always shows but becomes disabled after successful upload
@@ -164,7 +164,7 @@ with st.container():
         if st.session_state['upload_completed']:
             st.success("✅ Content has been uploaded to WordPress!")
         
-        # Upload button - disabled if already uploaded
+        # Upload button - always visible, disabled when upload_completed is True
         if st.button("Upload Content", type="primary", disabled=st.session_state['upload_completed']):
             with st.spinner("Uploading content to WordPress..."):
                 try:
@@ -184,7 +184,7 @@ with st.container():
                         categories=None,
                         meta=None
                     )
-                    st.session_state['upload_completed'] = True
+                    st.session_state['upload_completed'] = True  # <-- CHANGE: Mark upload as completed
                     st.rerun()  # Refresh to show success message and disable button
                 except Exception as e:
                     st.error(f"Error uploading content: {str(e)}")
