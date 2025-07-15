@@ -6,7 +6,6 @@ import base64
 from io import BytesIO
 from PIL import Image
 
-# Streamlit UI
 st.set_page_config(page_title="Content Generator", page_icon="📝", layout="wide")
 
 st.markdown("""
@@ -27,11 +26,13 @@ st.markdown("""This application generates detailed content showing how sfHawk he
 st.markdown('</div>', unsafe_allow_html=True)
 
 # Initialize session state
-for key in ['company_name', 'case_study_title', 'case_study_body', 'upload_completed']:
+for key in ['company_name', 'case_study_title', 'case_study_body', 'upload_completed', 'uploaded_post_url']:
     if key not in st.session_state:
-        st.session_state[key] = '' if key != 'upload_completed' else False
+        if key == 'upload_completed':
+            st.session_state[key] = False
+        else:
+            st.session_state[key] = ''
 
-# Input section
 with st.container():
     st.subheader("Enter Content Details")
     col1, col2, col3 = st.columns([2, 2, 1])
@@ -45,7 +46,6 @@ with st.container():
     with col3:
         content_type = st.selectbox("Content Type", ["Case Study", "Blog"], key='content_type')
 
-    # --- Generate Button ---
     if st.button(f"Generate {content_type}", type="primary"):
         if topic:
             with st.spinner(f"Generating {content_type.lower()}..."):
@@ -53,8 +53,9 @@ with st.container():
                 if title and body and not title.startswith("Error"):
                     st.session_state['case_study_title'] = title
                     st.session_state['case_study_body'] = body
-                    st.session_state['upload_completed'] = False  # <-- FIX: Reset upload button state after generation
-                    st.rerun()  # Force rerun to update the UI immediately
+                    st.session_state['upload_completed'] = False
+                    st.session_state['uploaded_post_url'] = ''
+                    st.rerun()
                 else:
                     st.error("Failed to generate content. Please try again.")
 
@@ -112,7 +113,6 @@ with st.container():
             with st.expander("Content Picture Preview", expanded=True):
                 st.image(image)
 
-    # Upload images
     st.subheader("Or Upload Images")
     img_col1, img_col2 = st.columns(2)
     with img_col1:
@@ -124,7 +124,6 @@ with st.container():
         if uploaded_file_2:
             st.image(uploaded_file_2, caption='Content Picture', width=100)
 
-    # Display generated content
     if st.session_state['case_study_title'] or st.session_state['case_study_body']:
         st.subheader("Generated Content")
 
@@ -137,7 +136,8 @@ with st.container():
             edited_title = st.text_input("Edit the title below", value=st.session_state['case_study_title'], key='case_study_title_input')
             if edited_title != st.session_state['case_study_title']:
                 st.session_state['case_study_title'] = edited_title
-                st.session_state['upload_completed'] = False  # <-- FIX: Enable upload button after editing title
+                st.session_state['upload_completed'] = False
+                st.session_state['uploaded_post_url'] = ''
                 st.rerun()
 
         preview_col, edit_col = st.columns([1, 1])
@@ -154,40 +154,43 @@ with st.container():
             edited_body = st.text_area("Edit the content below", value=st.session_state['case_study_body'], height=400, key='case_study_body_input')
             if edited_body != st.session_state['case_study_body']:
                 st.session_state['case_study_body'] = edited_body
-                st.session_state['upload_completed'] = False  # <-- FIX: Enable upload button after editing body
+                st.session_state['upload_completed'] = False
+                st.session_state['uploaded_post_url'] = ''
                 st.rerun()
 
-        # Upload button - always shows but becomes disabled after successful upload
         st.subheader("Upload to WordPress")
-        
-        # Show upload status if already uploaded
         if st.session_state['upload_completed']:
             st.success("✅ Content has been uploaded to WordPress!")
-        
-        # Upload button - always visible, disabled when upload_completed is True
-        if st.button("Upload Content", type="primary", disabled=st.session_state['upload_completed']):
-            with st.spinner("Uploading content to WordPress..."):
-                try:
-                    images = []
-                    if 'generated_image_1' in st.session_state:
-                        images.append(st.session_state['generated_image_1'])
-                    if 'generated_image_2' in st.session_state:
-                        images.append(st.session_state['generated_image_2'])
+            if st.session_state['uploaded_post_url']:
+                st.markdown(
+                    f"<a href='{st.session_state['uploaded_post_url']}' target='_blank'>🔗 View your post here</a>",
+                    unsafe_allow_html=True
+                )
+        else:
+            if st.button("Upload Content", type="primary"):
+                with st.spinner("Uploading content to WordPress..."):
+                    try:
+                        images = []
+                        if 'generated_image_1' in st.session_state:
+                            images.append(st.session_state['generated_image_1'])
+                        if 'generated_image_2' in st.session_state:
+                            images.append(st.session_state['generated_image_2'])
 
-                    post_id, post_url = main.upload_to_wordpress(
-                        st.session_state['case_study_title'],
-                        st.session_state['case_study_body'],
-                        images,
-                        st.session_state.get('content_type', 'Case Study'),
-                        template=None,
-                        page_template=None,
-                        categories=None,
-                        meta=None
-                    )
-                    st.session_state['upload_completed'] = True  # <-- Only after successful upload
-                    st.rerun()  # Refresh to show success message and disable button
-                except Exception as e:
-                    st.error(f"Error uploading content: {str(e)}")
+                        post_id, post_url = main.upload_to_wordpress(
+                            st.session_state['case_study_title'],
+                            st.session_state['case_study_body'],
+                            images,
+                            st.session_state.get('content_type', 'Case Study'),
+                            template=None,
+                            page_template=None,
+                            categories=None,
+                            meta=None
+                        )
+                        st.session_state['upload_completed'] = True
+                        st.session_state['uploaded_post_url'] = post_url  # <--- Store the post URL for display
+                        st.rerun()
+                    except Exception as e:
+                        st.error(f"Error uploading content: {str(e)}")
     else:
         if topic:
             st.info(f"Click 'Generate {content_type}' to create the content.")
