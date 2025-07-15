@@ -157,42 +157,37 @@ with st.container():
                 st.session_state['upload_completed'] = False  # ✅ Reset when body is edited
                 st.rerun()
 
-        # Upload button - now always shows when there's content and hasn't been uploaded yet
-        if not st.session_state['upload_completed']:
-            st.subheader("Upload to WordPress")
-            if st.button("Upload Content", type="primary"):
-                with st.spinner("Uploading content to WordPress..."):
-                    try:
-                        images = []
-                        if 'generated_image_1' in st.session_state:
-                            images.append(st.session_state['generated_image_1'])
-                        if 'generated_image_2' in st.session_state:
-                            images.append(st.session_state['generated_image_2'])
-
-                        post_id, post_url = main.upload_to_wordpress(
-                            st.session_state['case_study_title'],
-                            st.session_state['case_study_body'],
-                            images,
-                            st.session_state.get('content_type', 'Case Study'),
-                            template=None,
-                            page_template=None,
-                            categories=None,
-                            meta=None
-                        )
-                        st.session_state['upload_completed'] = True
-                        if post_url:
-                            st.success(f"Content uploaded successfully! [View Post]({post_url})")
-                        else:
-                            st.success(f"Content uploaded successfully! Post ID: {post_id}")
-                    except Exception as e:
-                        st.error(f"Error uploading content: {str(e)}")
-        else:
-            # Show upload status when already uploaded
-            st.subheader("Upload Status")
+        # Upload button - always shows but becomes disabled after successful upload
+        st.subheader("Upload to WordPress")
+        
+        # Show upload status if already uploaded
+        if st.session_state['upload_completed']:
             st.success("✅ Content has been uploaded to WordPress!")
-            if st.button("Upload Again", type="secondary"):
-                st.session_state['upload_completed'] = False
-                st.rerun()
+        
+        # Upload button - disabled if already uploaded
+        if st.button("Upload Content", type="primary", disabled=st.session_state['upload_completed']):
+            with st.spinner("Uploading content to WordPress..."):
+                try:
+                    images = []
+                    if 'generated_image_1' in st.session_state:
+                        images.append(st.session_state['generated_image_1'])
+                    if 'generated_image_2' in st.session_state:
+                        images.append(st.session_state['generated_image_2'])
+
+                    post_id, post_url = main.upload_to_wordpress(
+                        st.session_state['case_study_title'],
+                        st.session_state['case_study_body'],
+                        images,
+                        st.session_state.get('content_type', 'Case Study'),
+                        template=None,
+                        page_template=None,
+                        categories=None,
+                        meta=None
+                    )
+                    st.session_state['upload_completed'] = True
+                    st.rerun()  # Refresh to show success message and disable button
+                except Exception as e:
+                    st.error(f"Error uploading content: {str(e)}")
     else:
         if topic:
             st.info(f"Click 'Generate {content_type}' to create the content.")
