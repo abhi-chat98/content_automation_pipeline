@@ -203,21 +203,18 @@ def generate_content(topic, content_type="Case Study", keywords=None):
 
 def generate_image(prompt, size="1024x1024"):
     try:
-        # Initialize OpenAI client
-        openai.api_key = OPENAI_API_KEY
-        
         # Generate image using DALL-E
-        response = client.images.generate(
+        response = openai.images.generate(
             model="dall-e-3",  # Using DALL-E 3 for best quality
             prompt=prompt,
             size=size,
             quality="standard",
             n=1
         )
-        
+
         # Get the image URL from the response
         image_url = response.data[0].url
-        
+
         # Download the image
         image_response = requests.get(image_url)
         if image_response.status_code == 200:
@@ -226,10 +223,11 @@ def generate_image(prompt, size="1024x1024"):
             return image_data
         else:
             return None
-            
+
     except Exception as e:
         print(f"Error generating image: {str(e)}")
         return None
+
 
 def upload_to_wordpress(title, body, images=None, content_type="Case Study", template=None, page_template=None, categories=None, meta=None):
     """
