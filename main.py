@@ -174,21 +174,19 @@ def get_prompt_for_content_type(content_type, topic, keywords=None):
 def generate_content(topic, content_type="Case Study", keywords=None):
     try:
         prompt = get_prompt_for_content_type(content_type, topic, keywords)
-        
-client = OpenAI(api_key=OPENAI_API_KEY)
 
-response = client.chat.completions.create(
-    model="gpt-4",
-    messages=[
-        {"role": "system", "content": "You are a professional content writer specializing in manufacturing and production scheduling."},
-        {"role": "user", "content": prompt}
-    ],
-    temperature=0.7,
-    max_tokens=2000
-)
+        client = OpenAI(api_key=OPENAI_API_KEY)
 
+        response = client.chat.completions.create(
+            model="gpt-4",
+            messages=[
+                {"role": "system", "content": "You are a professional content writer specializing in manufacturing and production scheduling."},
+                {"role": "user", "content": prompt}
+            ],
+            temperature=0.7,
+            max_tokens=2000
+        )
 
-        
         raw_text = response.choices[0].message.content
         title, body = extract_title_and_body(raw_text)
 
@@ -206,6 +204,7 @@ response = client.chat.completions.create(
         if "429" in str(e):
             return "Error: Quota exceeded. Please check your API plan and billing details, and try again later.", ""
         return f"Error generating content: {str(e)}", ""
+
 
 def generate_image(prompt, size="1024x1024"):
     try:
