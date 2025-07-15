@@ -53,7 +53,7 @@ with st.container():
                 if title and body and not title.startswith("Error"):
                     st.session_state['case_study_title'] = title
                     st.session_state['case_study_body'] = body
-                    st.session_state['upload_completed'] = False  # ✅ Reset only on success
+                    st.session_state['upload_completed'] = False  # ✅ Reset on new content generation
                 else:
                     st.error("Failed to generate content. Please try again.")
 
@@ -136,6 +136,7 @@ with st.container():
             edited_title = st.text_input("Edit the title below", value=st.session_state['case_study_title'], key='case_study_title_input')
             if edited_title != st.session_state['case_study_title']:
                 st.session_state['case_study_title'] = edited_title
+                st.session_state['upload_completed'] = False  # ✅ Reset when title is edited
                 st.rerun()
 
         preview_col, edit_col = st.columns([1, 1])
@@ -152,9 +153,10 @@ with st.container():
             edited_body = st.text_area("Edit the content below", value=st.session_state['case_study_body'], height=400, key='case_study_body_input')
             if edited_body != st.session_state['case_study_body']:
                 st.session_state['case_study_body'] = edited_body
+                st.session_state['upload_completed'] = False  # ✅ Reset when body is edited
                 st.rerun()
 
-        # Upload button
+        # Upload button - now always shows when there's content and hasn't been uploaded yet
         if not st.session_state['upload_completed']:
             st.subheader("Upload to WordPress")
             if st.button("Upload Content", type="primary"):
@@ -183,6 +185,13 @@ with st.container():
                             st.success(f"Content uploaded successfully! Post ID: {post_id}")
                     except Exception as e:
                         st.error(f"Error uploading content: {str(e)}")
+        else:
+            # Show upload status when already uploaded
+            st.subheader("Upload Status")
+            st.success("✅ Content has been uploaded to WordPress!")
+            if st.button("Upload Again", type="secondary"):
+                st.session_state['upload_completed'] = False
+                st.rerun()
     else:
         if topic:
             st.info(f"Click 'Generate {content_type}' to create the content.")
