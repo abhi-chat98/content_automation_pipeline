@@ -14,7 +14,8 @@ import re
 import streamlit as st
 import collections
 import collections.abc
-from openai import OpenAI  # ✅ NEW SDK
+from openai import OpenAI
+import httpx
 
 collections.Iterable = collections.abc.Iterable
 
@@ -30,14 +31,20 @@ OPENAI_API_KEY = st.secrets["OPENAI_API_KEY"]
 if not OPENAI_API_KEY:
     raise ValueError("OPENAI_API_KEY not found in Streamlit secrets")
 
-# ✅ Initialize OpenAI Client using new SDK
-client = OpenAI(api_key=OPENAI_API_KEY)
+# ✅ Initialize OpenAI Client (Streamlit Cloud Safe)
+client = OpenAI(
+    api_key=OPENAI_API_KEY,
+    http_client=httpx.Client(
+        proxies=None,
+        timeout=60
+    )
+)
 
 def extract_title_and_body(text):
     title = ""
     body = ""
     lines = text.split('\n')
-    
+
     for i, line in enumerate(lines):
         if line.startswith('Title:'):
             title = line[6:].strip()
@@ -64,6 +71,7 @@ def extract_title_and_body(text):
 
     body = clean_body_text(body)
     body = format_body_text(body)
+
     return title, body
 
 def format_body_text(text):
@@ -71,10 +79,10 @@ def format_body_text(text):
         "Problem Statement:", "How sfHawk Helps:", "Benefits:", "Conclusion:",
         "Introduction:", "Main Content:", "Key Points:", "Summary:"
     ]
-    
+
     for section in sections:
         text = re.sub(rf"\n*{re.escape(section)}", f"\n{section}", text)
-    
+
     text = text.replace("**", "")
     for section in sections:
         text = text.replace(section, f"**{section}**")
@@ -101,6 +109,7 @@ def format_body_text(text):
         formatted_lines = []
         in_table = False
         table_lines = []
+
         for line in lines:
             if '|' in line and ('---' in line or any(c in line for c in ['Aspect', 'Traditional', 'Modern'])):
                 in_table = True
@@ -119,7 +128,8 @@ def format_body_text(text):
         text = '\n'.join(formatted_lines)
 
     text = text.replace("\n\n\n", "\n\n")
-    return text.strip()
+    text = text.strip()
+    return text
 
 def clean_body_text(text):
     if text.lstrip().startswith('Body:'):
@@ -139,7 +149,8 @@ def get_prompt_for_content_type(content_type, topic, keywords=None):
 def generate_content(topic, content_type="Case Study", keywords=None):
     try:
         prompt = get_prompt_for_content_type(content_type, topic, keywords)
-        response = client.chat.completions.create(  # ✅ NEW SYNTAX
+
+        response = client.chat.completions.create(
             model="gpt-4",
             messages=[
                 {"role": "system", "content": "You are a professional content writer specializing in manufacturing and production scheduling."},
@@ -148,9 +159,11 @@ def generate_content(topic, content_type="Case Study", keywords=None):
             temperature=0.7,
             max_tokens=2000
         )
+
         raw_text = response.choices[0].message.content
         title, body = extract_title_and_body(raw_text)
         return title, body
+
     except Exception as e:
         if "429" in str(e):
             return "Error: Quota exceeded. Please check your API plan and billing details.", ""
@@ -158,13 +171,14 @@ def generate_content(topic, content_type="Case Study", keywords=None):
 
 def generate_image(prompt, size="1024x1024"):
     try:
-        response = client.images.generate(  # ✅ NEW SYNTAX
+        response = client.images.generate(
             model="dall-e-3",
             prompt=prompt,
             size=size,
             quality="standard",
             n=1
         )
+
         image_url = response.data[0].url
         image_response = requests.get(image_url)
         if image_response.status_code == 200:
@@ -172,6 +186,7 @@ def generate_image(prompt, size="1024x1024"):
             return image_data
         else:
             return None
+
     except Exception as e:
         print(f"Error generating image: {str(e)}")
         return None
