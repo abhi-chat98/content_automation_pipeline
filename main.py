@@ -18,6 +18,12 @@ import re
 import streamlit as st
 import collections
 import collections.abc
+
+os.environ.pop("http_proxy", None)
+os.environ.pop("https_proxy", None)
+os.environ.pop("HTTP_PROXY", None)
+os.environ.pop("HTTPS_PROXY", None)
+
 from openai import OpenAI
 collections.Iterable = collections.abc.Iterable
 
