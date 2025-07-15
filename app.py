@@ -9,8 +9,7 @@ from PIL import Image
 # Streamlit UI
 st.set_page_config(page_title="Content Generator", page_icon="📝", layout="wide")
 
-st.markdown(
-    """
+st.markdown("""
     <style>
     .centered {
         display: flex;
@@ -20,79 +19,61 @@ st.markdown(
         text-align: center;
     }
     </style>
-    """,
-    unsafe_allow_html=True,
-)
+""", unsafe_allow_html=True)
 
 st.markdown('<div class="centered">', unsafe_allow_html=True)
 st.title("sfHawk's Content Generator")
-st.markdown("""
-This application generates detailed content showing how sfHawk helps companies improve their production scheduling 
-and management through automation. Enter a topic below to generate content.
-""")
+st.markdown("""This application generates detailed content showing how sfHawk helps companies improve their production scheduling and management through automation. Enter a topic below to generate content.""")
 st.markdown('</div>', unsafe_allow_html=True)
 
 # Initialize session state
-st.session_state.setdefault('company_name', '')
-st.session_state.setdefault('case_study_title', '')
-st.session_state.setdefault('case_study_body', '')
-st.session_state.setdefault('upload_completed', False)
+for key in ['company_name', 'case_study_title', 'case_study_body', 'upload_completed']:
+    if key not in st.session_state:
+        st.session_state[key] = '' if key != 'upload_completed' else False
 
 # Input section
 with st.container():
     st.subheader("Enter Content Details")
-
     col1, col2, col3 = st.columns([2, 2, 1])
-    
+
     with col1:
-        col1_1, col1_2 = st.columns([5, 1])
-        with col1_1:
-            topic = st.text_area(
-                "Topic",
-                placeholder="Enter the topic here",
-                key='topic_input',
-                height=100
-            )
-    
+        topic = st.text_area("Topic", placeholder="Enter the topic here", key='topic_input', height=100)
+
     with col2:
-        keywords = st.text_input(
-            "Keywords (Optional)",
-            placeholder="Enter keywords separated by commas",
-            help="These keywords will be incorporated into the generated content",
-            key='keywords'
-        )
-    
+        keywords = st.text_input("Keywords (Optional)", placeholder="Enter keywords separated by commas", help="These keywords will be incorporated into the generated content", key='keywords')
+
     with col3:
-        content_type = st.selectbox(
-            "Content Type",
-            ["Case Study", "Blog"],
-            key='content_type'
-        )
+        content_type = st.selectbox("Content Type", ["Case Study", "Blog"], key='content_type')
 
+    # --- Generate Button ---
+    if st.button(f"Generate {content_type}", type="primary"):
+        if topic:
+            with st.spinner(f"Generating {content_type.lower()}..."):
+                title, body = main.generate_content(topic, content_type, keywords)
+                if title and body and not title.startswith("Error"):
+                    st.session_state['case_study_title'] = title
+                    st.session_state['case_study_body'] = body
+                    st.session_state['upload_completed'] = False  # ✅ Reset only on success
+                else:
+                    st.error("Failed to generate content. Please try again.")
+
+    # Image generation
     st.subheader("Generate Custom Images")
-
-    # Display Picture
     st.markdown("#### Display Picture")
     img_prompt_col1, img_prompt_col2 = st.columns([3, 1])
     with img_prompt_col1:
-        image_prompt_1 = st.text_input(
-            "Display Picture Generation Prompt",
-            placeholder="Example: A modern manufacturing facility with CNC machines...",
-            key='image_prompt_1'
-        )
+        image_prompt_1 = st.text_input("Display Picture Generation Prompt", placeholder="Example: A modern manufacturing facility with CNC machines...", key='image_prompt_1')
     with img_prompt_col2:
         if st.button("Generate Display Picture", key="generate_image_btn_1"):
             if image_prompt_1:
                 with st.spinner("Generating display picture..."):
                     try:
-                        status_placeholder = st.empty()
-                        status_placeholder.info("Sending request to DALL-E API...")
                         image_data = main.generate_image(image_prompt_1)
                         if image_data:
                             st.session_state['generated_image_1'] = image_data
-                            status_placeholder.success("Display picture generated!")
+                            st.success("Display picture generated successfully!")
                         else:
-                            status_placeholder.error("Failed to generate image")
+                            st.error("Failed to generate image")
                     except Exception as e:
                         st.error(f"Error: {str(e)}")
 
@@ -104,28 +85,21 @@ with st.container():
             with st.expander("Display Picture Preview", expanded=True):
                 st.image(image)
 
-    # Content Picture
     st.markdown("#### Content Picture")
     img_prompt_col3, img_prompt_col4 = st.columns([3, 1])
     with img_prompt_col3:
-        image_prompt_2 = st.text_input(
-            "Content Picture Generation Prompt",
-            placeholder="Example: Close-up view of smart manufacturing process...",
-            key='image_prompt_2'
-        )
+        image_prompt_2 = st.text_input("Content Picture Generation Prompt", placeholder="Example: Close-up view of a smart manufacturing process...", key='image_prompt_2')
     with img_prompt_col4:
         if st.button("Generate Content Picture", key="generate_image_btn_2"):
             if image_prompt_2:
                 with st.spinner("Generating content picture..."):
                     try:
-                        status_placeholder = st.empty()
-                        status_placeholder.info("Sending request to DALL-E API...")
                         image_data = main.generate_image(image_prompt_2)
                         if image_data:
                             st.session_state['generated_image_2'] = image_data
-                            status_placeholder.success("Content picture generated!")
+                            st.success("Content picture generated successfully!")
                         else:
-                            status_placeholder.error("Failed to generate image")
+                            st.error("Failed to generate image")
                     except Exception as e:
                         st.error(f"Error: {str(e)}")
 
@@ -137,7 +111,7 @@ with st.container():
             with st.expander("Content Picture Preview", expanded=True):
                 st.image(image)
 
-    # Manual Upload
+    # Upload images
     st.subheader("Or Upload Images")
     img_col1, img_col2 = st.columns(2)
     with img_col1:
@@ -149,67 +123,38 @@ with st.container():
         if uploaded_file_2:
             st.image(uploaded_file_2, caption='Content Picture', width=100)
 
-    # Generate Button
-    if st.button(f"Generate {content_type}", type="primary"):
-        if topic:
-            with st.spinner(f"Generating {content_type.lower()}..."):
-                # ✅ Reset upload flag so the button appears after regeneration
-                st.session_state['upload_completed'] = False
-
-                title, body = main.generate_content(topic, content_type, keywords)
-                st.session_state['case_study_title'] = title
-                st.session_state['case_study_body'] = body
-
-    # Show generated content if available
+    # Display generated content
     if st.session_state['case_study_title'] or st.session_state['case_study_body']:
         st.subheader("Generated Content")
 
-        # Title
-        if st.session_state['case_study_title']:
-            title_col1, title_col2 = st.columns([1, 1])
-            with title_col1:
-                st.markdown("### Title")
-                st.markdown(f"**{st.session_state['case_study_title']}**")
-            with title_col2:
-                edited_title = st.text_input(
-                    "Edit the title below",
-                    value=st.session_state['case_study_title'],
-                    key='case_study_title_input'
-                )
-                if edited_title != st.session_state['case_study_title']:
-                    st.session_state['case_study_title'] = edited_title
-                    st.rerun()
+        title_col1, title_col2 = st.columns([1, 1])
+        with title_col1:
+            st.markdown("### Title")
+            st.markdown(f"**{st.session_state['case_study_title']}**")
+        with title_col2:
+            st.markdown("### Edit Title")
+            edited_title = st.text_input("Edit the title below", value=st.session_state['case_study_title'], key='case_study_title_input')
+            if edited_title != st.session_state['case_study_title']:
+                st.session_state['case_study_title'] = edited_title
+                st.rerun()
 
-        # Body
-        if st.session_state['case_study_body']:
-            st.markdown("### Content")
-            preview_col, edit_col = st.columns([1, 1])
-            with preview_col:
-                st.markdown("#### Preview")
-                st.markdown("""
-                <style>
-                table {
-                    width: 100%;
-                    border-collapse: collapse;
-                }
-                </style>
-                """, unsafe_allow_html=True)
-                body_content = st.session_state['case_study_body']
-                if '<table' in body_content:
-                    body_content = markdownify.markdownify(body_content, heading_style="ATX")
-                st.markdown(body_content, unsafe_allow_html=True)
-            with edit_col:
-                edited_body = st.text_area(
-                    "Edit the content below",
-                    value=st.session_state['case_study_body'],
-                    height=400,
-                    key='case_study_body_input'
-                )
-                if edited_body != st.session_state['case_study_body']:
-                    st.session_state['case_study_body'] = edited_body
-                    st.rerun()
+        preview_col, edit_col = st.columns([1, 1])
+        with preview_col:
+            st.markdown("#### Preview")
+            st.markdown("""<style>table {width: 100%; border-collapse: collapse;}</style>""", unsafe_allow_html=True)
+            body_content = st.session_state['case_study_body']
+            if '<table' in body_content:
+                body_content = markdownify.markdownify(body_content, heading_style="ATX")
+            st.markdown(body_content, unsafe_allow_html=True)
 
-        # Upload to WordPress
+        with edit_col:
+            st.markdown("#### Edit Content")
+            edited_body = st.text_area("Edit the content below", value=st.session_state['case_study_body'], height=400, key='case_study_body_input')
+            if edited_body != st.session_state['case_study_body']:
+                st.session_state['case_study_body'] = edited_body
+                st.rerun()
+
+        # Upload button
         if not st.session_state['upload_completed']:
             st.subheader("Upload to WordPress")
             if st.button("Upload Content", type="primary"):
@@ -233,13 +178,13 @@ with st.container():
                         )
                         st.session_state['upload_completed'] = True
                         if post_url:
-                            st.success(f"Content uploaded successfully! Post URL: {post_url}")
+                            st.success(f"Content uploaded successfully! [View Post]({post_url})")
                         else:
                             st.success(f"Content uploaded successfully! Post ID: {post_id}")
                     except Exception as e:
                         st.error(f"Error uploading content: {str(e)}")
-        else:
-            st.info("✅ Content already uploaded. Generate again to re-enable upload.")
+    else:
+        if topic:
+            st.info(f"Click 'Generate {content_type}' to create the content.")
 
-# Footer
 st.markdown("---")
