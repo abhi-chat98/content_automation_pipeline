@@ -1,6 +1,7 @@
 import os
 import base64
 from PIL import Image
+import io
 import requests
 from requests.auth import HTTPBasicAuth
 from datetime import datetime
@@ -22,6 +23,7 @@ WORDPRESS_URL = st.secrets["WORDPRESS_URL"]
 WORDPRESS_USERNAME = st.secrets["WORDPRESS_USERNAME"]
 WORDPRESS_PASSWORD = st.secrets["WORDPRESS_PASSWORD"]
 OPENAI_API_KEY = st.secrets["OPENAI_API_KEY"]
+
 if not OPENAI_API_KEY:
     raise ValueError("OPENAI_API_KEY not found in Streamlit secrets")
 
@@ -144,14 +146,25 @@ def upload_to_wordpress(title, body, images=None, content_type="Case Study", tem
 
     def upload_image_and_get_id(image_data, filename):
         media_endpoint = f"{WORDPRESS_URL}/wp-json/wp/v2/media"
+
+        # Decode base64 and resize to 854x480
         image_binary = base64.b64decode(image_data)
+        image = Image.open(io.BytesIO(image_binary)).convert("RGB")
+        image = image.resize((854, 480))  # 16:9 480p
+
+        # Save resized image to buffer
+        buffer = io.BytesIO()
+        image.save(buffer, format="PNG")
+        resized_image_binary = buffer.getvalue()
+
         headers = {
             'Content-Disposition': f'attachment; filename={filename}',
             'Content-Type': 'image/png',
         }
+
         resp = requests.post(
             media_endpoint,
-            data=image_binary,
+            data=resized_image_binary,
             headers=headers,
             auth=HTTPBasicAuth(USERNAME, APP_PASSWORD),
             verify=False
@@ -169,7 +182,7 @@ def upload_to_wordpress(title, body, images=None, content_type="Case Study", tem
         if len(images) > 1 and images[1]:
             detail_featured_image_id, content_image_url = upload_image_and_get_id(images[1], f"content_{datetime.now().strftime('%Y%m%d_%H%M%S')}.png")
 
-    # Embed second image (content) in body if available
+    # Embed second image into body if available
     if content_image_url:
         body = f'<img src="{content_image_url}" style="max-width: 100%; height: auto;" /><br><br>' + body
 
